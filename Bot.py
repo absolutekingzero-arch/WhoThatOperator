@@ -1163,9 +1163,24 @@ async def op_info(ctx, key: str):
 
 """Khởi chạy chính"""
 # END 
-if __name__ == "__main__":
-    bot.run(TOKEN)
+async def start_web():
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 10000))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    print(f"🌐 Web server running on port {port}")
 
+async def main():
+    # khởi động web server
+    await start_web()
+    # khởi động bot discord
+    await bot.start(TOKEN)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 """ make by: - Chat GPT
              - Deepseek
              - CarKingMoewOh """
