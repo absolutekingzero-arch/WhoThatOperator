@@ -19,6 +19,17 @@ from discord.ext import commands
 import boto3
 from botocore.config import Config
 import tempfile
+from aiohttp import web
+import threading
+
+async def handle(request):
+    return web.Response(text="Bot is running!")
+
+def run_web():
+    app = web.Application()
+    app.router.add_get("/", handle)
+    port = int(os.environ.get("PORT", 10000))
+    web.run_app(app, port=port)
 
 # --- Config / env ---
 load_dotenv()
