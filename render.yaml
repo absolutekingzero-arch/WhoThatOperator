@@ -18,3 +18,4 @@ services:
         sync: false
       - key: R2_BUCKET_NAME
         sync: false
+    runtime: python3.11   # 🔹 thêm dòng này
