@@ -474,7 +474,7 @@ def extract_key_and_variant(filename: str) -> tuple:
     # Chuẩn hóa: chuyển về lowercase, loại bỏ [alpha] và background markers
     normalized = stem.lower()
     normalized = re.sub(r'\[.*?\]', '', normalized)  # Loại bỏ [alpha], [alpha][alpha]
-    normalized = re.sub(r'_blackbg|_whitebg|_bg', '', normalized)  # Loại bỏ background markers
+    normalized = re.sub(r'_blackbg|_whitebg', '', normalized)  # Loại bỏ background markers
     normalized = re.sub(r'[^a-z0-9_+#]', '_', normalized)  # Giữ lại ký tự cho variant (+, #)
     normalized = re.sub(r'_+', '_', normalized)  # Chuẩn hóa nhiều _ thành một
     normalized = normalized.strip('_')
