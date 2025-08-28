@@ -1,0 +1,13 @@
+{
+  "map": {
+    "WARRIOR": "Guard",
+    "TANK": "Defender",
+    "DEFENDER": "Defender",
+    "SNIPER": "Sniper",
+    "CASTER": "Caster",
+    "MEDIC": "Medic",
+    "SUPPORT": "Supporter",
+    "PIONEER": "Vanguard",
+    "SPECIAL": "Specialist"
+  }
+}

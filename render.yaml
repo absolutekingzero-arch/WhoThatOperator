@@ -4,7 +4,7 @@ services:
     env: python
     plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python Bot.py"
+    startCommand: "python main.py"
     envVars:
       - key: DISCORD_TOKEN
         sync: false
