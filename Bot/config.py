@@ -48,19 +48,14 @@ def read_json(p):
 def normalize(s: str) -> str:
     return unicodedata.normalize("NFC", s).strip()
 
-# --- file paths (absolute) ---
-CHARACTER_EN = data_path("character_tableEN.json")
-CHARACTER_CN = data_path("character_tableCN.json")
-PROFESSION_MAP = data_path("profession_map.json")
-CN_ONLY_MAP = data_path("cn_only_map.json")
-AMIYA_PATCH = data_path("char_patch_table.json")
+SCORES_FILE = Path("scores.json")
 
-# --- load JSON into variables ---
-EN_JSON_PATH = read_json(CHARACTER_EN)
-CN_JSON_PATH = read_json(CHARACTER_CN)
-PROFESSION_MAP_PATH = read_json(PROFESSION_MAP)
-CN_ONLY_MAP_PATH = read_json(CN_ONLY_MAP)
-AMIYA_JSON_PATH = read_json(AMIYA_PATCH)
+# --- file paths (absolute) ---
+EN_JSON_PATH = data_path("character_tableEN.json")
+CN_JSON_PATH = data_path("character_tableCN.json")
+PROFESSION_MAP_PATH = data_path("profession_map.json")
+CN_ONLY_MAP_PATH = data_path("cn_only_map.json")
+AMIYA_JSON_PATH = data_path("char_patch_table.json")
 
 class GameState:
     def __init__(self, channel: discord.TextChannel, origin_ctx=None):
