@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 import discord
+import unicodedata
+
 
 # --- Config / env ---
 load_dotenv()
@@ -15,6 +17,49 @@ R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
 R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME")
 R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL")
 
+# Nếu config.py nằm trong thư mục Bot/, và Data/ nằm ở root repo:
+BASE = Path(__file__).resolve().parent.parent  # repo root
+# nếu Data nằm trong Bot/, dùng: BASE = Path(__file__).resolve().parent
+
+DATA_DIR = BASE / "Data"
+LOG_DIR = BASE / "logs"
+ENV_PATH = BASE / ".env"
+
+# tạo thư mục logs (nếu cần)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+# helper để build path an toàn
+def data_path(*parts) -> Path:
+    return DATA_DIR.joinpath(*parts)
+
+# đọc JSON an toàn với encoding UTF-8 và normalize unicode
+def read_json(filename: str):
+    p = data_path(filename)
+    if not p.exists():
+        raise FileNotFoundError(f"Missing data file: {p!s}")
+    text = p.read_text(encoding="utf-8")
+    try:
+        return json.loads(text)
+    except Exception as e:
+        raise RuntimeError(f"Failed parsing JSON {p!s}: {e}") from e
+
+# normalize helper cho lookup strings (NFC recommended)
+def normalize(s: str) -> str:
+    return unicodedata.normalize("NFC", s).strip()
+
+# --- file paths (absolute) ---
+CHARACTER_EN = data_path("character_tableEN.json")
+CHARACTER_CN = data_path("character_tableCN.json")
+PROFESSION_MAP = data_path("profession_map.json")
+CN_ONLY_MAP = data_path("cn_only_map.json")
+AMIYA_PATCH = data_path("char_patch_table.json")
+
+# --- load JSON into variables ---
+EN_JSON_PATH = read_json(CHARACTER_EN)
+CN_JSON_PATH = read_json(CHARACTER_CN)
+PROFESSION_MAP_PATH = read_json(PROFESSION_MAP)
+CN_ONLY_MAP_PATH = read_json(CN_ONLY_MAP)
+AMIYA_JSON_PATH = read_json(AMIYA_PATCH)
 
 class GameState:
     def __init__(self, channel: discord.TextChannel, origin_ctx=None):
@@ -38,15 +83,6 @@ if not TOKEN:
 
 # --- Paths ---
 SCORES_FILE = Path("scores.json")
-
-# EN/CN JSON paths
-EN_JSON_PATH = Path("data/character_tableEN.json")
-CN_JSON_PATH = Path("data/character_tableCN.json")
-
-# Map files
-PROFESSION_MAP_PATH = Path("data/profession_map.json")
-CN_ONLY_MAP_PATH = Path("data/cn_only_map.json")
-AMIYA_JSON_PATH = Path("data/char_patch_table.json")
 
 # Intents configuration (chỉ định nghĩa intents, không tạo bot)
 def get_intents():

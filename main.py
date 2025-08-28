@@ -1,27 +1,22 @@
 # main.py
-from __future__ import annotations
 import os
 import sys
 import asyncio
 from aiohttp import web
-from dotenv import load_dotenv
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'Bot'))
+# import bot object của bạn (điều chỉnh đường dẫn)
+# from Bot.bot import bot
 
-load_dotenv()
-
-# Import bot instance (tuyệt đối, không dùng relative import)
+# ---- placeholder bot for example ----
+# replace with: from Bot.bot import bot
+# Here we assume `bot` is an instance of discord.Client / commands.Bot
+bot = None
 try:
-    from Bot.bot import bot
-    
+    from Bot.bot import bot as _bot
+    bot = _bot
 except Exception as e:
-    print("Import error:", repr(e))
-    print("sys.path:", sys.path)
-    raise
+    print("Import bot failed:", repr(e))
 
-
-
-# Web server handler
 async def handle(request):
     return web.Response(text="Bot is running!")
 
@@ -35,9 +30,44 @@ async def start_web():
     await site.start()
     print(f"🌐 Web server running on port {port}")
 
+async def start_bot_with_backoff(bot, token, max_attempts=6):
+    delay = 10
+    for attempt in range(1, max_attempts + 1):
+        try:
+            print(f"[bot] start attempt {attempt}")
+            await bot.start(token)
+            return
+        except Exception as e:
+            lower = str(e).lower()
+            if "429" in lower or "too many requests" in lower or "rate limited" in lower or "access denied" in lower:
+                print(f"[bot] rate-limited detected attempt {attempt}: {repr(e)}")
+                print(f"[bot] backing off for {delay} seconds")
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 600)
+                continue
+            else:
+                print("[bot] fatal error:", repr(e))
+                raise
+
 async def main():
-    #await start_web()
-    await bot.start(os.getenv("DISCORD_TOKEN"))
+    token = os.getenv("DISCORD_TOKEN")
+    if not token:
+        print("ERROR: DISCORD_TOKEN not set. Set it in Render Environment variables.")
+        sys.exit(1)
+
+    if bot is None:
+        print("ERROR: bot object not imported. Check import path.")
+        sys.exit(1)
+
+    # start web so Render port scan passes (if you want web keep-alive)
+    await start_web()
+
+    try:
+        await start_bot_with_backoff(bot, token)
+    except Exception as e:
+        print("Bot failed to start:", repr(e))
+        # exit non-zero so Deploy fails visibly
+        sys.exit(1)
 
 if __name__ == "__main__":
     asyncio.run(main())
