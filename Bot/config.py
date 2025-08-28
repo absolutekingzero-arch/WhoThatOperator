@@ -33,17 +33,16 @@ def data_path(*parts) -> Path:
     return DATA_DIR.joinpath(*parts)
 
 # đọc JSON an toàn với encoding UTF-8 và normalize unicode
-def read_json(path):
-    if isinstance(path, (str, Path)):
-        p = data_path(path) if isinstance(path, str) else path
-    else:
+def read_json(p):
+    if isinstance(p, str):
+        p = data_path(p)
+    elif not isinstance(p, Path):
         raise TypeError("read_json expects str or Path")
 
-    if not p.exists():
-        raise FileNotFoundError(f"Missing data file: {p!s}")
-
-    text = p.read_text(encoding="utf-8")
+    text = p.read_text(encoding="utf-8-sig")
     return json.loads(text)
+
+
 
 # normalize helper cho lookup strings (NFC recommended)
 def normalize(s: str) -> str:
