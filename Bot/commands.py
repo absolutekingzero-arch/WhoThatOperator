@@ -9,7 +9,7 @@ from .config import  GameState, all_scores ,LOOP_DELAY,is_r2_enabled, games,loop
 from .utils import EN_JSON, CN_JSON,canonicalize_key,get_display_names,download_r2_object,generate_hint_for_char,display_len, pad_display
 # Change import to:
 from .game_logic import (
-    reveal_answer, schedule_next
+    reveal_answer
 )
 try:
     characters_list = load_characters_from_files()
@@ -306,6 +306,8 @@ async def show_help(ctx):
     `!myscore` - Xem điểm của bạn
     `!op <key>` - Xem thông tin nhân vật (VD: `!op char_002_amiya`)
     `!commandhelp` - Hiển thị hướng dẫn này
+    Bản Update đến Arknights CN 2.6.41
+    Nếu Bot sập vào https://whothatoperator.onrender.com/ để khởi động Bot
     """
     await ctx.send(help_text)
 
@@ -342,6 +344,23 @@ async def op_info(ctx, key: str):
     )
     await ctx.send(f"```\n{msg}\n```")
 
+async def schedule_next(origin_ctx, seconds=0):
+    """Schedule next game round if still in loop mode."""
+    cid = origin_ctx.channel.id
+    try:
+        delay = looping_settings.get(cid, seconds)  # Default to 5 seconds if not set
+        if delay > 0:
+            await asyncio.sleep(delay)
+        # Only run if channel is still in loop mode
+        if cid in looping_channels:
+           await start_game(origin_ctx, seconds)
+    except asyncio.CancelledError:
+        # Task was cancelled by stop()
+        pass
+    except Exception as e:
+        print("Failed to schedule next round:", e)
+    finally:
+        scheduled_tasks.pop(cid, None)
 
 def setup(bot):
     bot.command(name="start")(start_game)

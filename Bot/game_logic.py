@@ -4,7 +4,8 @@ import os
 import random
 import asyncio
 import discord
-from .config import is_r2_enabled,games,looping_channels,looping_settings,scheduled_tasks
+
+from .config import is_r2_enabled
 from .image_processing import download_r2_object
 
 # Game state management
@@ -62,23 +63,3 @@ async def reveal_answer(channel: discord.TextChannel, char):
                 )
     except Exception as e:
         print("Failed to send reveal answer:", e)
-
-async def schedule_next(origin_ctx, seconds=0):
-    """Schedule next game round if still in loop mode."""
-    cid = origin_ctx.channel.id
-    try:
-        delay = looping_settings.get(cid, 5)  # Default to 5 seconds if not set
-        if delay > 0:
-            await asyncio.sleep(delay)
-        # Only run if channel is still in loop mode
-        if cid in looping_channels:
-            # We need to pass characters_list here, but it's not available in this context
-            # This will need to be handled by the calling code
-            pass
-    except asyncio.CancelledError:
-        # Task was cancelled by stop()
-        pass
-    except Exception as e:
-        print("Failed to schedule next round:", e)
-    finally:
-        scheduled_tasks.pop(cid, None)

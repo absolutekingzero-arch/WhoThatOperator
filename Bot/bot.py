@@ -11,7 +11,7 @@ from discord.ext import commands as discord_commands
 # project imports (relative)
 from . import commands as cmd_module   # module commands.py (renamed here to cmd_module)
 from .config import get_intents, PREFIX, all_scores, save_scores, games, looping_channels,GameState
-from .game_logic import reveal_answer, schedule_next 
+from .game_logic import reveal_answer 
 from .utils import fuzzy_match_threshold, EN_JSON, CN_JSON
 
 # Create bot
@@ -104,4 +104,4 @@ async def on_message(message):
         if channel.id in looping_channels:
             origin = state.origin_ctx or await bot.get_context(message)
             # Sửa: truyền 0 để tự động tính thời gian
-            asyncio.create_task(schedule_next(origin, 0))  # Đây là dòng sửa
+            asyncio.create_task(cmd_module.schedule_next(origin, 0))  # Đây là dòng sửa
