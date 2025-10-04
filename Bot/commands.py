@@ -247,8 +247,61 @@ async def provide_hint(ctx):
     if getattr(state, 'hint_shown', False):
         await ctx.send("Gợi ý đã được hiện rồi trong ván này.")
         return
-    await ctx.send(f"🔎 Gợi ý: {state.hint}")
+
+    hint = state.hint or ""
+    # pattern để tìm placeholder <<R2:...>>
+    pattern = r'<<R2:(.+?)>>'
+    m = _re_try.search(pattern, hint)
+    label = _re_try.sub(pattern, '', hint).strip() or None
+    print(m)
+    print(label)
+
+    # nếu không có placeholder -> gửi text bình thường
+    if not m:
+        await ctx.send(f"🔎 Gợi ý: {hint}")
+        state.hint_shown = True
+        return
+
+    file_key = m.group(1)  # ví dụ "images/Icon/icon_profession_xxx.png"
+
+    # gửi: text label (nếu có) + file (từ R2 hoặc local)
+    try:
+        if is_r2_enabled():
+            # tải từ R2 (download_r2_object trả đường dẫn đến file tạm)
+            loop = asyncio.get_event_loop()
+            tmp_path = await loop.run_in_executor(None, download_r2_object, file_key)
+            try:
+                content = f"🔎 Gợi ý: {label}" if label else "🔎 Gợi ý:"
+                await channel.send(content=content, file=discord.File(tmp_path, filename=os.path.basename(tmp_path)))
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+        else:
+            # thử path như trong placeholder (relative tới cwd)
+            if os.path.exists(file_key):
+                content = f"🔎 Gợi ý: {label}" if label else "🔎 Gợi ý:"
+                await channel.send(content=content, file=discord.File(file_key, filename=os.path.basename(file_key)))
+            else:
+                # thử tìm relative so với repo root (dưới package parent)
+                from pathlib import Path
+                candidate = Path(__file__).resolve().parent.parent.joinpath(file_key)
+                if candidate.exists():
+                    content = f"🔎 Gợi ý: {label}" if label else "🔎 Gợi ý:"
+                    await channel.send(content=content, file=discord.File(str(candidate), filename=candidate.name))
+                else:
+                    # không tìm thấy ảnh cục bộ -> gửi label và báo tên file để debug
+                    await channel.send(f"🔎 Gợi ý: {label}\n(Hình: `{file_key}` không tìm thấy cục bộ.)")
+    except Exception as e:
+        # trong trường hợp lỗi tải/gửi file, gửi lại label và lỗi để dễ debug
+        try:
+            await channel.send(f"🔎 Gợi ý: {label or hint}\n(Lỗi khi lấy ảnh gợi ý: {e})")
+        except Exception:
+            pass
+
     state.hint_shown = True
+
 
 # Sửa hàm leaderboard
 async def leaderboard(ctx):

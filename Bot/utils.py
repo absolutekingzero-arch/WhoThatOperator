@@ -8,6 +8,8 @@ from difflib import SequenceMatcher
 import boto3
 from botocore.config import Config
 import tempfile
+from typing import Dict, Any
+
 
 # Import từ config
 from .config import (
@@ -269,6 +271,7 @@ def get_display_names(key: str, char: dict) -> tuple:
                 display_en = found
 
     return display_en, display_cn
+
 def canonicalize_key(key: str):
     """Temporarily don't canonicalize - keep original key"""
     return key
@@ -280,53 +283,143 @@ def map_profession_hint(raw_prof: str) -> str:
     s = str(raw_prof).strip().upper()
     return PROFESSION_MAP.get(s, raw_prof)
 
-def generate_hint_for_char(char: dict) -> str:
-    """Generate hint for character"""
+def _slugify(name: str) -> str:
+    if not name:
+        return ""
+    s = str(name)
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    s = s.lower()
+    s = re.sub(r"[^\w\s-]", "", s)
+    s = re.sub(r"[\s\-]+", "_", s)
+    return s.strip("_")
+# --- generate_hint_for_char (finalized behavior) ---
+def generate_hint_for_char(char: dict, prefer: str = None, troll_chance: float = 0.002) -> str:
+    """
+    Return a single hint string. Options are:
+      - "Class: <mapped profession>"
+      - "Sub-class: <subprofession>"
+      - "Thuộc : <nation>"  (main)
+      - "Quốc gia liên quan : <nation>" (sub)
+      - rare troll -> "is an operator"
+    Placeholder for image is included and follows:
+      - Class -> <<R2:images/Icon/icon_profession_<slug>.png>>
+      - Sub-class -> <<R2:images/subicon/sub_<slug>_icon.png>>
+      - Nation -> <<R2:images/Logo/Logo_<slug>.png>>
+    """
     if not isinstance(char, dict):
         return ""
 
-    key = char.get("key")
-    
-    # Check if this is a special Amiya variant first
-    if key in AMIYA_JSON.get("patchChars", {}):
-        patch_char = AMIYA_JSON["patchChars"][key]
-        profession = patch_char.get("profession")
-        sub_profession = patch_char.get("subProfessionId")
-        
-        if profession and sub_profession:
-            # For Amiya variants, use both profession and subprofession as hint
-            return f"{map_profession_hint(profession)} ({sub_profession})"
-        elif profession:
-            return map_profession_hint(profession)
-        else:
-            return ""
-
+    key = char.get("key", "")
     entry = {}
     if key:
         entry = EN_JSON.get(key) or CN_JSON.get(key) or {}
 
-    candidates = []
+    # pre-build fallback placeholder base
+    fallback_name = f"{key}.png" if key else "unknown.png"
 
-    p = entry.get("profession") or char.get("profession")
-    if p:
-        candidates.append(p)
+    # Very rare troll check (roll before everything to surprise)
+    try:
+        roll = random.random()
+    except Exception:
+        roll = 1.0
+    if 0.0 <= float(troll_chance) and roll < float(troll_chance):
+        # Use fallback placeholder (images path) for troll
+        ph = f"<<R2:images/Icon/icon_profession_unknown.png>>"
+        return f"is an operator {ph}"
 
-    sp = entry.get("subProfessionId") or entry.get("subProfession") or char.get("subProfessionId") or char.get("subProfession")
-    if sp:
-        candidates.append(sp)
+    # Amiya patch special-case: still treat profession/subProfession but with new labels
+    if key in AMIYA_JSON.get("patchChars", {}):
+        patch_char = AMIYA_JSON["patchChars"][key]
+        profession = patch_char.get("profession")
+        sub_profession = patch_char.get("subProfessionId")
+        options = []
+        if profession:
+            options.append(f"Class: {map_profession_hint(profession)}")
+        if sub_profession:
+            options.append(f"Sub-class: {sub_profession}")
+        placeholder = f"<<R2:images/Icon/icon_profession_{_slugify(profession or 'unknown')}.png>>"
+        if options:
+            return f"{random.choice(options)} {placeholder}"
+        return placeholder
 
-    nation = entry.get("nationId") or (entry.get("mainPower") or {}).get("nationId") or entry.get("nation") or char.get("nationId") or char.get("nation")
-    if nation:
-        candidates.append(nation)
+    # collect class & subclass
+    profession = entry.get("profession") or char.get("profession")
+    subprofession = (entry.get("subProfessionId") or entry.get("subProfession")
+                     or char.get("subProfessionId") or char.get("subProfession"))
 
-    candidates = [c for i, c in enumerate(candidates) if c and c not in candidates[:i]]
+    # nations: mainPower.nationId, nationId/nation, plus subPower array
+    nations = []
+    main_power = (entry.get("mainPower") or {}).get("nationId") or entry.get("nationId") \
+                 or entry.get("nation") or char.get("nationId") or char.get("nation")
+    if main_power:
+        nations.append({"value": str(main_power), "role": "main"})
 
-    if not candidates:
-        return ""
+    subp = entry.get("subPower") or char.get("subPower")
+    if isinstance(subp, list):
+        for sp in subp:
+            if isinstance(sp, dict):
+                nid = sp.get("nationId") or sp.get("nation")
+                if nid and not (main_power and str(nid) == str(main_power)):
+                    nations.append({"value": str(nid), "role": "sub"})
 
-    hint = str(random.choice(candidates))
-    return map_profession_hint(hint)
-# --- Image processing utilities ---
+    # dedupe nations preserving order
+    seen = set(); deduped = []
+    for n in nations:
+        if n["value"] not in seen:
+            seen.add(n["value"]); deduped.append(n)
+    nations = deduped
+
+    # Build options: class, sub-class, nations (with VN labels)
+    options = []
+    if profession:
+        options.append(("class", f"Class: {map_profession_hint(str(profession))}", f"images/Icon/icon_profession_{_slugify(profession)}.png"))
+    if subprofession:
+        options.append(("subclass", f"Sub-class: {str(subprofession)}", f"images/subicon/sub_{_slugify(subprofession)}_icon.png"))
+
+    for n in nations:
+        if n.get("role") == "main":
+            label = f"Thuộc : {n['value']}"
+            filename = f"images/Logo/logo_{_slugify(n['value'])}.png"
+            options.append(("nation_main", label, filename))
+        else:
+            label = f"Quốc gia liên quan : {n['value']}"
+            filename = f"images/Logo/logo_{_slugify(n['value'])}.png"
+            options.append(("nation_sub", label, filename))
+
+    # If prefer is set, filter options accordingly
+    if prefer:
+        p = prefer.lower()
+        filtered = []
+        for kind, label, fname in options:
+            if p in ("class", "profession") and kind == "class":
+                filtered.append((kind, label, fname))
+            elif p in ("subclass", "sub-profession", "sub_profession") and kind == "subclass":
+                filtered.append((kind, label, fname))
+            elif p == "nation" and kind.startswith("nation"):
+                filtered.append((kind, label, fname))
+        if filtered:
+            options = filtered
+
+    # Deduplicate labels (preserve order)
+    seen_labels = set()
+    deduped_opts = []
+    for kind, label, fname in options:
+        if label not in seen_labels:
+            seen_labels.add(label)
+            deduped_opts.append((kind, label, fname))
+    options = deduped_opts
+
+    # Choose random option (if any)
+    if options:
+        kind, chosen_label, chosen_file = random.choice(options)
+        placeholder = f"<<R2:{chosen_file}>>"
+        return f"{chosen_label} {placeholder}"
+
+    # nothing to choose: return fallback placeholder
+    fallback_ph = f"<<R2:images/Icon/icon_profession_unknown.png>>"
+    return fallback_ph
+
 def extract_key_and_variant(filename: str) -> tuple:
     """
     Extract base key and variant from filename
