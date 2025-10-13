@@ -359,7 +359,6 @@ async def show_help(ctx):
     `!myscore` - Xem điểm của bạn
     `!op <key>` - Xem thông tin nhân vật (VD: `!op char_002_amiya`)
     `!commandhelp` - Hiển thị hướng dẫn này
-    Bản Update đến Arknights CN 2.6.41
     Nếu Bot sập vào https://whothatoperator.onrender.com/ để khởi động Bot
     """
     await ctx.send(help_text)
